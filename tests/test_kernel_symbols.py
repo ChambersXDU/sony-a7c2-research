@@ -94,6 +94,20 @@ class KernelSymbolTests(unittest.TestCase):
   with self.assertRaisesRegex(ValueError,'anchor mismatch'):
    compareSnapshot(image,recoverSymbols(image),snapshot(image),0x400081000)
 
+ def test_static_key_requires_both_words_and_exact_branch_target(self):
+  original,layout,symbols = synthetic_kernel()
+  for before,after,expected in [(0x14000002,0xd503201f,'static-key'),
+                                 (0xd5033f9f,0x14000002,'unclassified'),
+                                 (0x14000003,0xd503201f,'unclassified'),
+                                 (0xd503201f,0x14000003,'unclassified')]:
+   with self.subTest(before=before,after=after):
+    image,captured = bytearray(original),bytearray(original)
+    struct.pack_into('<I',image,0x700,before)
+    struct.pack_into('<I',captured,0x700,after)
+    report = compareSnapshot(image,recoverSymbols(image),snapshot(captured),0x400080000)
+    self.assertEqual(len(report['changes']),1)
+    self.assertEqual(report['changes'][0]['classification'],expected)
+
  def test_recovery_addresses_aliases_and_all_markers(self):
   image,layout,symbols = synthetic_kernel()
   result = recoverSymbols(image)

@@ -260,18 +260,21 @@ def compareSnapshot(image, recovered, file, physicalBase):
     code,target,key = struct.unpack_from('<QQQ',image,offset)
     jumps[code-base] = target
  changes = []
+ def isStaticKeyWord(contents, offset, target):
+  instruction = struct.unpack_from('<I',contents,offset)[0]
+  immediate = instruction & 0x3ffffff
+  if immediate & 0x2000000:
+   immediate -= 1<<26
+  return instruction == 0xd503201f or (instruction & 0xfc000000 == 0x14000000 and
+                                      base+offset+immediate*4 == target)
+
  for offset in range(0,textSize,4):
   if not all(captured[offset:offset+4]) or image[offset:offset+4] == text[offset:offset+4]:
    continue
   kind = 'unclassified'
   feature = [f for start,size,f in alternatives if start<=offset<start+size]
   if offset in jumps:
-   instruction = struct.unpack_from('<I',text,offset)[0]
-   immediate = instruction & 0x3ffffff
-   if immediate & 0x2000000:
-    immediate -= 1<<26
-   if instruction == 0xd503201f or (instruction & 0xfc000000 == 0x14000000 and
-                                   base+offset+immediate*4 == jumps[offset]):
+   if isStaticKeyWord(image,offset,jumps[offset]) and isStaticKeyWord(text,offset,jumps[offset]):
     kind = 'static-key'
   elif feature:
    kind = 'alternative-site'
