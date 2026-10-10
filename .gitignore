@@ -16,3 +16,8 @@ nflasha[0-9]*
 *.tmp
 memory.img
 /.wbi2-*/
+/kernel-analysis/
+.kernel-symbols-*/
+vmlinux.bin
+kernel.elf
+System.map

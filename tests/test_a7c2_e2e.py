@@ -1,6 +1,8 @@
 """Opt-in test of the official ILCE-7CM2 2.01 download; no firmware fixture."""
 
+from collections import Counter
 import hashlib
+import json
 import os
 from pathlib import Path
 import shutil
@@ -107,6 +109,34 @@ class A7C2EndToEndTests(unittest.TestCase):
        remaining -= n
      offset += size
     self.assertEqual(offset, 266834432)
+   kernel = partitions / 'nflasha3_unpacked/vmlinux.bin'
+   self.assertEqual(sha256(kernel), '620a6a3c2b4f09a3696f2fbf06bab98b49be5eaad6bdb366a1f33319fcb6e9d2')
+   symbolOutput = Path(tmp) / 'kernel-symbols'
+   exported = subprocess.run([sys.executable, str(ROOT / 'tools/kernel_symbols.py'),
+                              '-f', str(kernel), '-o', str(symbolOutput),
+                              '--snapshot', str(partitions / 'nflasha5'), '--physical-base', '0x400080000'],
+                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=60)
+   self.assertEqual(exported.returncode, 0, exported.stdout)
+   metadata = json.loads((symbolOutput / 'analysis.json').read_text())
+   self.assertEqual(metadata['symbolCount'], 41265)
+   self.assertEqual(metadata['baseAddress'], 0xffffff8008080000)
+   symbols = json.loads((symbolOutput / 'symbols.json').read_text())
+   lookup = {s['name']:s['address'] for s in symbols}
+   self.assertEqual(lookup['cxd90057_resume_ssboot'], 0xffffff80084a67f0)
+   self.assertEqual(lookup['linux_banner'], 0xffffff80084b0090)
+   comparison = json.loads((symbolOutput / 'snapshot-comparison.json').read_text())
+   self.assertEqual(comparison['pages'], {'matched':1004,'changed':68,'uncaptured':0})
+   self.assertEqual(comparison['resumeSymbols'], ['cxd90057_resume_ssboot'])
+   self.assertEqual(Counter(c['classification'] for c in comparison['changes']),
+                    {'static-key':131,'alternative-site':16})
+   elf = (symbolOutput / 'kernel.elf').read_bytes()
+   self.assertEqual(elf[4096:4096+kernel.stat().st_size], kernel.read_bytes())
+   # Independently anchor Image code to captured physical memory, not a guessed base.
+   with kernel.open('rb') as original, (flat / 'memory.img').open('rb') as captured:
+    for offset in [0, 0x800, 0x95d78, 0x4262a0, 0x4267f0, 0x430090]:
+     original.seek(offset)
+     captured.seek(0x400080000 + offset - flatMapping['baseAddress'])
+     self.assertEqual(captured.read(64), original.read(64), hex(offset))
 
 
 if __name__ == '__main__':

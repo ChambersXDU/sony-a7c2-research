@@ -50,3 +50,15 @@ flags and the distinction between captured memory and uncaptured gaps.
 
 The second command creates a sparse `memory.img` and an address map in a new
 directory. Extracted firmware and memory images must remain outside Git.
+
+### Recover kernel symbols for static analysis ###
+The verified ILCE-7CM2 2.01 kernel Image retains 41,265 kallsyms entries.
+The source-only tool exports a symbolized analysis ELF and can compare its
+kernel text against the WBI2 snapshot, validating the physical-address mapping.
+See [kernel symbol recovery](docs/kernel-symbols.md) for reproduction, the
+identified Snapshot Boot entry, captured code differences and format limits.
+
+    python tools/kernel_symbols.py -f vmlinux.bin -o /tmp/kernel-analysis
+
+The output is a derived analysis container. Keep it and the full symbol map
+outside Git; it is not a flashable image or a reconstruction of build debug data.
