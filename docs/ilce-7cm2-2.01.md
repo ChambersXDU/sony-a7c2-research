@@ -6,6 +6,12 @@ pycryptodomex 3.24.0 and PyYAML 6.0.3. The development baseline is
 commit `3955d7890fc38daf942bb52827599bfe35de4a14`. Both this unmodified
 baseline and the patch were run against the complete official download.
 
+This page records the initial support patch, commit
+`0bf0915dce843e398b23d11e2f3d2e97086093e0`. The subsequent
+[WBI2 contribution](wbi2.md) adds section and memory-image outputs and extends
+the tests; the baseline comparison and file counts below describe that initial
+patch.
+
 [PR #52](https://github.com/ma1co/fwtool.py/pull/52) was still open and unmerged
 when checked; its head matched that baseline. David Buchanan's existing
 CXD90057 implementation already decrypts this update. This patch adds verified
@@ -31,8 +37,9 @@ not introduce the decryption algorithm.
 ## Reproduction
 
 Obtain the update through Sony's download flow and applicable terms. Store the
-firmware and outputs outside the checkout. The unpacked tree uses about
-3.84 GiB, in addition to the 1.06 GiB input; reserve at least 6 GiB for one
+firmware and outputs outside the checkout. The initial unpacked tree used about
+3.84 GiB, in addition to the 1.06 GiB input. With WBI2 section extraction and
+the sparse image, outputs use under 4.5 GiB; reserve at least 6 GiB for one
 extraction. The opt-in test also needs 6 GiB free in the system temporary
 directory and removes its own output afterward.
 
@@ -114,9 +121,9 @@ not modernized by this patch.
 ## Limits and unverified behavior
 
 - `nflasha5` (267,171,648 bytes) begins with **WBI2**. It is preserved intact
-  but not parsed. The existing warm-boot parser recognizes WBI1 only; WBI2
-  parsing is outside this patch. Extraction is not a complete interpretation
-  of every partition.
+  but was not parsed by the baseline or the initial ILCE-7CM2 support patch.
+  A subsequent, separate [WBI2 contribution](wbi2.md) now extracts this
+  uncompressed 64-bit variant. Other WBI2 flags remain unsupported.
 - The unpacker writes regular files/directories, omitting symbolic links and
   special files. It is not a faithful filesystem restoration tool.
 - CRC/block checks verify the checks implemented by fwtool. Camera-side

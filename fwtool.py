@@ -46,6 +46,9 @@ def writeFileTree(files, path):
     if archive.isArchive(dstFile):
      print('Unpacking %s' % fn)
      writeFileTree(archive.readArchive(dstFile), fn + '_unpacked')
+    elif wbi.isWbi2(dstFile):
+     print('Unpacking %s' % fn)
+     unpackWbi(dstFile, fn + '_unpacked', file.mtime)
 
  # Set mtimes:
  for fn, file in files:
@@ -199,7 +202,18 @@ def unpackBootloader(file, outDir, mtime):
 
 def unpackWbi(file, outDir, mtime):
  print('Extracting warm boot image')
- writeFileTree((toUnixFile('/0x%08x.dat' % c.physicalAddr, c.contents, mtime) for c in wbi.readWbi(file)), outDir)
+ chunks = list(wbi.readWbi(file))
+ if wbi.isWbi2(file):
+  if len(set(c.physicalAddr for c in chunks)) != len(chunks):
+   raise ValueError('Duplicate WBI2 section address')
+  mkdirs(outDir)
+  if sum(c.size for c in chunks) > shutil.disk_usage(outDir).free:
+   raise ValueError('Not enough disk space for WBI2 sections')
+ writeFileTree((toUnixFile('/0x%08x.dat' % c.physicalAddr, c.contents, mtime) for c in chunks), outDir)
+ if wbi.isWbi2(file):
+  with open(outDir + '/memory.yaml', 'w') as yamlFile:
+   writeYaml({'sections': [{'file': '0x%08x.dat' % c.physicalAddr, 'physicalAddr': c.physicalAddr,
+                           'virtualAddr': c.virtualAddr, 'size': c.size} for c in chunks]}, yamlFile)
 
 
 def unpackCommand(file, outDir):

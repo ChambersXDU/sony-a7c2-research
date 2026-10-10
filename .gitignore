@@ -14,3 +14,5 @@ firmware.tar
 updater.img
 nflasha[0-9]*
 *.tmp
+memory.img
+/.wbi2-*/

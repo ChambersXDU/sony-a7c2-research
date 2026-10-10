@@ -38,3 +38,15 @@ The following files are accepted as input (*-f* flag):
 
 See [ILCE-7CM2 Ver. 2.01 validation](docs/ilce-7cm2-2.01.md) for the official
 download provenance, checksums, extraction results, limitations and tests.
+
+### Extract a WBI2 memory snapshot ###
+Uncompressed 64-bit WBI2 images are extracted into address-named section files
+and `memory.yaml`, including zero-filled sections. They are also recognized
+inside firmware archives. See [WBI2 validation](docs/wbi2.md) for supported
+flags and the distinction between captured memory and uncaptured gaps.
+
+    python fwtool.py unpack -f nflasha5 -o /tmp/wbi2-sections
+    python tools/wbi2_memory.py -f nflasha5 -o /tmp/wbi2-memory
+
+The second command creates a sparse `memory.img` and an address map in a new
+directory. Extracted firmware and memory images must remain outside Git.
