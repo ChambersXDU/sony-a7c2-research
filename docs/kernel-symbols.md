@@ -98,13 +98,19 @@ physical mapping; use the separately validated snapshot comparison.
 
 ## Coverage and limits
 
-Ten synthetic tests cover multiple markers, alias/local/weak symbols, ELF
+Eleven synthetic tests cover multiple markers, alias/local/weak symbols, ELF
 structure and byte preservation, malformed tables/headers, signed-offset
 rejection, output protection, snapshot anchors and patch classification.
 The real-firmware test also recovers all 41,265 symbols after a fresh unpack,
 checks the ELF bytes, verifies the resume symbol and compares captured text.
-Locally all 42 tests passed with the firmware supplied. Without it, 41 passed
+Locally all 43 tests passed with the firmware supplied. Without it, 42 passed
 and one real-firmware test skipped. No new project dependency is needed.
+
+The static-key classifier requires both original and captured words to be a
+NOP or an unconditional branch to the exact jump-table target. A regression
+test reproduced two false-positive cases in the previous classifier, which
+only checked the captured word. The stricter check preserves the real-image
+result of 131 static-key transitions and 16 alternatives sites.
 
 This reader supports the observed Linux 4.9 little-endian AArch64,
 unsigned-base-relative, 256-byte-aligned profile. Absolute-address tables,
@@ -112,3 +118,38 @@ signed absolute-per-CPU encoding, newer long-name layouts, other alignments and
 other firmwares remain unverified. Structural validation is not authentication;
 plausible altered symbols or bytes can remain structurally valid. The ELF
 contains original boot-image code; the report describes captured differences.
+
+## REA / Ghidra cross-check
+
+The optional [REA skill](https://github.com/morluto/rea/blob/4999e4be2c1669d04417fcdea582052048adbb2d/.agents/skills/reverse-engineer-anything/SKILL.md)
+was applied using `rea-agents` 6.3.0, Node 22.19.0, Temurin JDK 21.0.12.1
+and Ghidra 12.1.4 on macOS ARM64. Ghidra's missing ARM64 native tools were
+built locally from its distribution; these are analysis-environment dependencies,
+not fwtool dependencies. Its default 2 GiB heap failed on the full symbolized
+kernel. An 8 GiB heap completed full-image auto-analysis. Independent focused
+views of the original bytes were then used for practical function queries.
+
+Ghidra instruction listings and function dossiers agree with LLVM and the
+official `boot.S` / `resume.S`: `cxd900xx_init` takes its MMU/cache-disable path
+only at EL3, while `cxd900xx_smp_init` writes the three secondary boot-vector
+slots, clears their flag bytes and issues DSB/SEV. The Snapshot Boot entry
+selects state 4 and joins the already identified shared continuation.
+Recovered symbols include both state aliases at `0xffffff80086c1440`.
+Decompiler C output is supporting evidence; assembly controls conclusions
+about register preservation across these assembly helpers.
+
+With the corresponding tools installed, a full-image query can be reproduced
+from the generated ELF (allow memory and time for kernel auto-analysis):
+
+```sh
+export JAVA_HOME=/path/to/jdk-21
+export GHIDRA_INSTALL_DIR=/path/to/ghidra_12.1.4_PUBLIC
+GHIDRA_HEADLESS_MAXMEM=8G npx -y rea-agents@6.3.0 function \
+  /tmp/sony-fw/new-kernel-analysis/kernel.elf cxd90057_resume_ssboot \
+  --provider ghidra --format json
+```
+
+Function extents in focused views are analysis annotations, not recovered
+build symbol sizes. Imported context excludes unselected downstream code;
+this pass does not establish the full `cpu_resume` behavior or camera runtime
+state. Generated ELF files and native-analysis dossiers remain outside Git.

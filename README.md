@@ -62,3 +62,7 @@ identified Snapshot Boot entry, captured code differences and format limits.
 
 The output is a derived analysis container. Keep it and the full symbol map
 outside Git; it is not a flashable image or a reconstruction of build debug data.
+
+The [application entry observations](docs/application-entry.md) identify the
+`appFw.so` initialization callback, thread wrapper and resource paths from
+static instructions and ELF relocations in the same verified firmware.
