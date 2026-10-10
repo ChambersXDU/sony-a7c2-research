@@ -67,14 +67,23 @@ def isDat(file):
 def readChunks(file):
  header = DatHeader.unpack(file)
 
+ if not header:
+  raise ValueError('Truncated DAT header')
+
  if header.magic != datHeaderMagic:
   raise Exception('Wrong magic')
 
  chunks = []
+ file.seek(0, 2)
+ fileSize = file.tell()
  offset = DatHeader.size
  while True:
   chunk = DatChunkHeader.unpack(file, offset)
+  if not chunk:
+   raise ValueError('Truncated DAT chunk header')
   offset += DatChunkHeader.size
+  if offset + chunk.size > fileSize:
+   raise ValueError('Truncated DAT chunk data')
   chunks.append((chunk.type, FilePart(file, offset, chunk.size)))
   offset += chunk.size
   if chunk.type == dendChunkType:

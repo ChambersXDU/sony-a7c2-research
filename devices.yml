@@ -348,6 +348,10 @@ ILCE-7:
   arch: CXD90014
   model: 0x41030013
   apps: '2.3'
+ILCE-7CM2:
+  arch: CXD90057
+  key: k8
+  model: 0x20030014
 ILCE-7C:
   arch: CXD90045
   model: 0x91030019

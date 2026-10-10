@@ -1,3 +1,16 @@
 /build
 /dist
 *.pyc
+__pycache__/
+/.venv/
+BODYDATA.DAT
+BODYDATA.DAT.part
+/sony-fw/
+/unpacked/
+*_unpacked/
+firmware.fdat
+firmware.dat
+firmware.tar
+updater.img
+nflasha[0-9]*
+*.tmp

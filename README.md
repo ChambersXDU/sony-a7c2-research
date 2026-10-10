@@ -6,7 +6,7 @@ A tool to unpack Sony camera firmware images, originally ported from [nex-hack's
 The following firmware types can be extracted:
 
 * **"FDAT" firmware updates**
-  * **CXD90057**: ILCE-7M4
+  * **CXD90057**: ILCE-7M4, ILCE-7CM2
   * **CXD90045**: ILCE-7M3, ILCE-6600, …
   * **CXD90014**: ILCE-7, ILCE-6000, ...
   * **CXD4132**: DSC-RX100, NEX-6, …
@@ -33,4 +33,8 @@ Download the [latest release](https://github.com/ma1co/fwtool.py/releases/latest
 The following files are accepted as input (*-f* flag):
 * A Windows firmware updater executable (.exe file)
 * The *FirmwareData.dat* file extracted from an updater
+* A *BODYDATA.DAT* memory-card update (ILCE-7CM2 Ver. 2.01 verified)
 * A firmware dump created by running `dd if=/dev/nflasha of=dump.dat` on the camera
+
+See [ILCE-7CM2 Ver. 2.01 validation](docs/ilce-7cm2-2.01.md) for the official
+download provenance, checksums, extraction results, limitations and tests.

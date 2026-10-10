@@ -113,6 +113,13 @@ class BlockCrypter(Crypter):
  def __init__(self, blockSize):
   super(BlockCrypter, self).__init__(blockSize, blockSize - 4)
 
+ def decrypt(self, file):
+  def decryptBlock(data):
+   if len(data) != self._decryptBlockSize:
+    raise BlockCryptException('Truncated encrypted block')
+   return self.unpackBlock(self.decryptBlock(data))
+  return self._crypt(file, self._decryptBlockSize, decryptBlock)
+
  def _calcSum(self, data):
   return sum(parse16leArr(data)) & 0xffff
 
@@ -202,6 +209,9 @@ class AesCbcCrypter(AesCrypter):
    return self._cipher2.decrypt(data)
 
  def decrypt(self, file):
+  file.seek(0, 2)
+  if file.tell() < 0x110 + self._decryptBlockSize:
+   raise BlockCryptException('Truncated encrypted FDAT')
   file.seek(-0x110, 2)
   size = file.tell()
   self._iv = file.read(0x10)
@@ -264,6 +274,9 @@ def readFdat(file):
  """Reads a decrypted FDAT file and returns its contents"""
  header = FdatHeader.unpack(file)
 
+ if not header:
+  raise ValueError('Truncated FDAT header')
+
  if header.magic != fdatHeaderMagic:
   raise Exception('Wrong magic')
 
@@ -287,6 +300,11 @@ def readFdat(file):
    break
  if not fileSystem:
   raise Exception('No file system found')
+
+ file.seek(0, 2)
+ fileSize = file.tell()
+ if header.firmwareOffset + header.firmwareSize > fileSize or fileSystem.offset + fileSystem.size > fileSize:
+  raise ValueError('Truncated FDAT payload')
 
  return FdatFile(
   model = header.model,
