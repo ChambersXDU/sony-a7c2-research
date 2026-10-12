@@ -51,6 +51,15 @@ flags and the distinction between captured memory and uncaptured gaps.
 The second command creates a sparse `memory.img` and an address map in a new
 directory. Extracted firmware and memory images must remain outside Git.
 
+For memory forensics, export LiME instead: captured physical ranges remain
+readable and absent ranges stay unmapped in Volatility 3.
+
+    python tools/wbi2_lime.py -f nflasha5 -o /tmp/wbi2-lime
+
+See [actual memory analysis](docs/memory-forensics.md) for the verified kernel
+banner, structured kernel log and reachable task-list results, source-derived
+partial DWARF profiles, optional dependencies and reproducible firmware tests.
+
 ### Recover kernel symbols for static analysis ###
 The verified ILCE-7CM2 2.01 kernel Image retains 41,265 kallsyms entries.
 The source-only tool exports a symbolized analysis ELF and can compare its

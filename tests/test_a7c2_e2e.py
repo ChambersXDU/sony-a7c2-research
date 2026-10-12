@@ -2,6 +2,7 @@
 
 from collections import Counter
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -137,6 +138,94 @@ class A7C2EndToEndTests(unittest.TestCase):
      original.seek(offset)
      captured.seek(0x400080000 + offset - flatMapping['baseAddress'])
      self.assertEqual(captured.read(64), original.read(64), hex(offset))
+   self.verify_forensics(Path(tmp), partitions, kernel, entries)
+
+ def verify_forensics(self, tmp, partitions, kernel, entries):
+  lime = tmp / 'lime'
+  result = subprocess.run([sys.executable, str(ROOT / 'tools/wbi2_lime.py'),
+                           '-f', str(partitions / 'nflasha5'), '-o', str(lime)],
+                          capture_output=True, text=True, timeout=300)
+  self.assertEqual(result.returncode, 0, result.stderr)
+  image = lime / 'memory.lime'
+  mapping = yaml.safe_load((lime / 'memory.yaml').read_text())
+  self.assertEqual(image.stat().st_size, 292926368)
+  self.assertEqual(sha256(image), '3d5292bd82685355ff5538e1b8349dd6408d6196880741132138158a9efabb14')
+  self.assertEqual(mapping['capturedBytes'], 292888576)
+  self.assertEqual(mapping['sourceSha256'], 'db3730c8dbb2de71cfb7a66c343ba8e752e0f374a3a4104196ceac1e9d1b08dc')
+  self.assertEqual(len(mapping['gaps']), 1140)
+  self.assertEqual(sum(g['size'] for g in mapping['gaps']), 277532672)
+  self.assertEqual(sum(s['size'] for s in mapping['sections'] if s['wbi2Zero']), 26054656)
+  # Read the original raw descriptor table and every payload independently.
+  payloadOffsets, offset = {}, 512
+  for entry in entries:
+   payloadOffsets[entry[0]] = offset
+   offset += entry[1]
+  with image.open('rb') as exported, (partitions / 'nflasha5').open('rb') as raw:
+   for entry, section in zip(sorted(entries), mapping['sections']):
+    addr, storedSize, _, flag, size, virt, _, _ = entry
+    self.assertEqual(struct.unpack('<IIQQQ', exported.read(32)), (0x4c694d45, 1, addr, addr + size - 1, 0))
+    self.assertEqual(section, {'physicalAddr': addr, 'virtualAddr': virt,
+                              'offset': exported.tell(), 'size': size, 'wbi2Zero': bool(flag & 1)})
+    raw.seek(payloadOffsets[addr])
+    remaining = size
+    while remaining:
+     n = min(remaining, 65536)
+     self.assertEqual(exported.read(n), b'\0' * n if flag & 1 else raw.read(n), hex(addr))
+     remaining -= n
+   self.assertEqual(exported.read(), b'')
+  if importlib.util.find_spec('volatility3'):
+   from volatility3.framework import contexts, exceptions
+   from volatility3.framework.layers import physical, lime as limeLayers
+   context = contexts.Context()
+   context.config['file.location'] = image.as_uri()
+   file = physical.FileLayer(context, 'file', 'file')
+   context.layers.add_layer(file)
+   try:
+    layer = limeLayers.LimeStacker.stack(context, 'file')
+    context.layers.add_layer(layer)
+    for section in mapping['sections']:
+     self.assertTrue(layer.is_valid(section['physicalAddr'], section['size']))
+    for gap in mapping['gaps']:
+     for addr in [gap['physicalAddr'], gap['physicalAddr'] + gap['size'] - 1]:
+      self.assertFalse(layer.is_valid(addr))
+      with self.assertRaises(exceptions.InvalidAddressException):
+       layer.read(addr, 1)
+   finally:
+    file.destroy()
+   banners = subprocess.run([sys.executable, '-c',
+                             'import sys; sys.argv[0] = "vol"; from volatility3.cli import main; main()',
+                             '-q', '--offline', '-f', str(image), '-r', 'json', 'banners.Banners'],
+                            capture_output=True, text=True, timeout=120)
+   self.assertEqual(banners.returncode, 0, banners.stderr)
+   rows = json.loads(banners.stdout)
+   self.assertEqual(len(rows), 1)
+   self.assertEqual(rows[0]['Offset'], 0x4004b0090)
+   self.assertTrue(rows[0]['Banner'].startswith('Linux version 4.9.337-scel+'))
+  # Opt-in source/tool dependencies regenerate the DWARF profile, rather than
+  # silently relying on a pre-existing local profile.
+  if os.environ.get('SONY_A7C2_SOURCE'):
+   profile = tmp / 'profile'
+   for name in ['SONY_A7C2_CLANG', 'SONY_DWARF2JSON']:
+    self.assertTrue(os.environ.get(name), 'Set ' + name + ' for full source-based forensics validation')
+   build = subprocess.run([sys.executable, str(ROOT / 'tools/kernel_printk_profile.py'),
+                           '--source', os.environ['SONY_A7C2_SOURCE'], '--kernel', str(kernel),
+                           '--clang', os.environ['SONY_A7C2_CLANG'], '--dwarf2json', os.environ['SONY_DWARF2JSON'],
+                           '--tasks', '-o', str(profile)], capture_output=True, text=True, timeout=600)
+   self.assertEqual(build.returncode, 0, build.stderr)
+   from tools.volatility_wbi2 import analyseLime
+   report, logs, tasks = analyseLime(image, kernel, profile)
+   self.assertEqual(report['capturedSections'], 1181)
+   self.assertEqual(report['unmappedGaps'], 1140)
+   self.assertEqual(report['ring']['log_buf'], 0xffffff80086e7538)
+   self.assertEqual(report['ring']['records'], 573)
+   self.assertEqual(report['ring']['activeBytes'], 37212)
+   self.assertEqual(len(logs), 672)
+   self.assertEqual(logs[0]['line'], 'Booting Linux on physical CPU 0x0')
+   self.assertEqual(logs[-1]['line'], 'WBI: count_sections_p2:1181, 71506, 11764a00(11764a00)')
+   self.assertEqual(71506 * 4096, mapping['capturedBytes'])
+   self.assertEqual(len(tasks), 286)
+   self.assertEqual([(t['pid'], t['comm']) for t in tasks[:2]], [(1, 'init2'), (2, 'kthreadd')])
+   self.assertEqual(report['tasks']['checkedOffsets'], {'tasks': 648, 'pid': 904, 'tgid': 908, 'comm': 1336})
 
 
 if __name__ == '__main__':

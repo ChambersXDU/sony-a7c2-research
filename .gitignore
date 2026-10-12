@@ -15,6 +15,7 @@ updater.img
 nflasha[0-9]*
 *.tmp
 memory.img
+memory.lime
 /.wbi2-*/
 /kernel-analysis/
 .kernel-symbols-*/

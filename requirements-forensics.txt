@@ -1,0 +1,2 @@
+# Optional analysis tools; fwtool itself keeps its original dependencies.
+volatility3==2.28.0
